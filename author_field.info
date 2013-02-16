@@ -1,0 +1,7 @@
+name = Author Field
+description = "Creates a custom field for storing authors."
+package = Fields
+core = 7.x
+files[] = field_author.module
+
+dependencies[] = email

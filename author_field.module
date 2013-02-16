@@ -1,0 +1,407 @@
+<?php
+
+/**
+* @file
+* Module file for the author field module.
+*/
+
+/**
+ * Implements hook_field_info().
+ *
+ * Provides the description of the field.
+ */
+function author_field_field_info() {
+    return array(
+        'author_field' => array(
+            'label' => t('Author Field'),
+            'description' => t('Autocomplete fields for Name and Organization'),
+            'default_widget' => 'author_field_widget',
+            'default_formatter' => 'author_field_formatter',
+        ),
+    );
+}
+
+/**
+ * Implements hook_field_widget_info().
+ */
+function author_field_field_widget_info() {
+    return array(
+        'author_field_widget' => array(
+            'label' => t('Author Field'),
+            'field types' => array('author_field'),
+        ),
+    );
+}
+
+/**
+ * Implements hook_field_validate().
+ *
+ * Verifies that the valid node id is entered in the textbox 
+ * 
+ */
+function author_field_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+    foreach ($items as $delta => $item) {
+        if (!empty($item['author_node_id'])) {
+
+            //check if the entered node id of a author_content exists in the database
+            $test_node = node_load($item['author_node_id']);
+            $test_node_exists = ($test_node != FALSE);
+
+            //if incorrect node id is entered, throw the error
+            if ($test_node_exists == FALSE) {
+                $errors[$field['field_name']][$langcode][$delta][] = array(
+                    'error' => 'author_field_invalid',
+                    'message' => t('Author/user does not exists. Please select valid entry.'),
+                );
+            }
+        }
+    }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function author_field_field_is_empty($item, $field) {
+    return empty($item['author_node_id']);
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function author_field_field_formatter_info() {
+    return array(
+        'author_field_formatter' => array(
+            'label' => t('Simple formatter for author field'),
+            'field types' => array('author_field'),
+        ),
+    );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ * 
+ * Displays the author information in a tabular format while viewing a node
+ * 
+ */
+function author_field_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+    $element = array();
+    global $base_url;
+
+    switch ($display['type']) {
+
+        case 'author_field_formatter':
+            foreach ($items as $delta => $item) {
+
+                //make sure that given author still exists in the database and has not been deleted
+                $author = node_load($item['author_node_id']);
+                $author_exists = ($author != FALSE);
+
+                $HTML = "";
+
+                if ($author_exists == TRUE) {
+
+                    //create a renderable html output to display on a node's page
+
+                    $HTML .= "<div class='field-author-view'>";
+
+                    $HTML .= "<table><tr><td class='td-profile-picture'>";
+
+                    drupal_add_css(drupal_get_path('module', 'author_field') . "/author_field.css");
+
+                    //check if a picture has been uplodaed for a given author node otherwise show the default profile picture
+                    if (isset($author->field_author_picture['und'])) {
+                        $picture = file_create_url($author->field_author_picture['und'][0]['uri']);
+                        $HTML .= "<img class='profile-picture' src='" . $picture . "' />";
+                    } 
+                    else {
+
+                        $picture = $base_url . "/" . drupal_get_path('module', 'author_field') . "/profile_default.jpg";
+                        $HTML .= "<img class='profile-picture' src='" . $picture . "' />";
+                    }
+
+
+                    $HTML .="</td><td>";
+                    $HTML .="<br/><b>Name: </b>" . "<a id='author_link' nid='" . check_plain($author->nid) . "' href='" . $base_url . "/node/" . check_plain($author->nid) . "'>" . check_plain($author->title) . "</a>";
+
+
+                    if (isset($author->field_author_organization['und'])) {
+
+                        $count_terms = count($author->field_author_organization['und']);
+                        $organization_link = "";
+                        $organization = "";
+                        for ($c = 0; $c < $count_terms; $c++) {
+
+                            $tid = $author->field_author_organization['und'][$c]['tid'];
+                            $term = taxonomy_term_load($tid);
+
+                            //check if term still exists in the database
+                            if ($term != FALSE) {
+                                $organization = check_plain($term->name);
+                            }
+                            $organization_link .= "<a href='" . $base_url . "/taxonomy/term/" . check_plain($tid) . "'>" . $organization . " </a> ";
+                            if ($c < ($count_terms - 1)) {
+                                $organization_link .= ',';
+                            }
+                        }
+
+                        $HTML .="<br/><b>Organization(s): </b>" . $organization_link;
+                    }
+
+                    if (isset($author->field_author_email['und'])) {
+                        $email = trim($author->field_author_email['und'][0]['email']);
+
+                        $field = field_get_items('node', $author, 'field_author_email');
+                        //get the renderable output of an email from email module
+                        $email_render = field_view_value('node', $author, 'field_author_email', $field[0]);
+
+                        $HTML .="<br/><b>Email: </b>" . $email_render['#markup'];
+                    }
+
+
+                    $HTML .="</td></tr></table>";
+
+                    $HTML .= "</div>";
+                } 
+                else {
+                    //show the error message if we could not find the author node in the database
+                    $HTML = "<div class='message error'>Could not find author/user with node id:" + $item['author_node_id'] + "</div>";
+                }
+                $element[$delta]['#markup'] = $HTML;
+            }
+            break;
+    }
+    return $element;
+}
+
+/*
+ * Returns the node id for a given node alias. Called only when a pathauto has been enabled for author_content content type
+ * 
+ */
+
+function author_field_getNodeId() {
+
+    if (isset($_POST['alias'])) {
+
+        $alias = strip_tags($_POST['alias']);
+        $path = drupal_lookup_path("source", $alias);
+        $nid = str_replace('node/', "", $path);
+        echo json_encode(array('nid' => $nid));
+    }
+}
+
+/*
+ * 
+ * Returns the authors list as html code to display in autocomplete listbox
+ * 
+ */
+
+function author_field_getAuthorData() {
+    $HTML = "";
+    $HTML_NewAuthor = "";
+
+    $contentType = "author_content";
+
+    //get all author nodes
+    $nodes = db_query('SELECT * FROM {node} WHERE promote = :pro AND status = :sta and type = :typ ORDER BY created DESC', array(':pro' => 1, ':sta' => 1, ':typ' => $contentType));
+
+
+    //for each author node
+    foreach ($nodes as $node) {
+        $author = node_load($node->nid);
+
+        $name = "";
+        $organization = "";
+
+        $nid = $node->nid;
+        if (isset($author->title)) {
+            $name = trim(check_plain($author->title));
+        }
+
+        if (isset($author->field_author_organization['und'])) {
+
+            $count_terms = count($author->field_author_organization['und']);
+            $organization = "";
+            for ($c = 0; $c < $count_terms; $c++) {
+
+                $term = taxonomy_term_load($author->field_author_organization['und'][$c]['tid']);
+
+                //check if term still exists in the database
+                if ($term != FALSE) {
+                    $organization .= check_plain($term->name);
+                }
+
+                if ($c < ($count_terms - 1)) {
+                    $organization .= ', ';
+                }
+            }
+        }
+
+
+
+        $HTML .= "<div authorname= '$name' nid='$nid' class=\"field-author-entry\"><div class='field-author-name'>$name</div><div class='field-author-nid'> {nid::$nid}</div><br/><div class='field-author-organization'> $organization </div> </div>";
+    }
+
+    //check if use has permission to add new author-content content  
+    if (user_access("create author_content content")) {
+        $HTML_NewAuthor = "<div authorname= 'addnewentry' nid='' class='field-author-addnewentry'> Click here to add new</div>";
+    }
+    $HTML = "<div id='field-author-data' style='display:none;'>" . $HTML_NewAuthor . $HTML . "</div>";
+    echo $HTML;
+}
+
+/**
+ * Implements hook_field_widget_form().
+ */
+function author_field_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+    drupal_add_library('system', 'ui.dialog');
+    global $base_url;
+
+    $author_node_id = isset($items[$delta]['author_node_id']) ? check_plain($items[$delta]['author_node_id']) : '';
+
+    $element += array(
+        '#delta' => $delta,
+    );
+    $element['author_node_id'] = array();
+    switch ($instance['widget']['type']) {
+
+        case 'author_field_widget':
+            $field_name = $element["#field_name"];
+
+            $nid = NULL;
+            $name = "";
+            $organization = "";
+            $nid_text = "";
+
+            if (isset($form_state['values'])) {
+                if (isset($form_state['values']["$field_name"]["und"][$delta])) {
+                    $nid = check_plain($form_state['values']["$field_name"]["und"][$delta]["author_node_id"]);
+                }
+            }
+
+            if ($author_node_id != '') {
+                $nid = $author_node_id;
+            }
+
+            //when node is previewd or shown with validation errors, we lose our author data, so we need to load it again
+            if ($nid != NULL) {
+
+                $nid_text = "{nid:$nid}";
+                $author = node_load($nid);
+                if (isset($author->title)) {
+                    $name = trim(check_plain($author->title));
+                }
+
+                if (isset($author->field_author_organization['und'])) {
+
+
+                    $term = taxonomy_term_load($author->field_author_organization['und'][0]['tid']);
+                    if ($term == FALSE) {
+                        $organization = "";
+                    } 
+                    else {
+                        $organization = check_plain($term->name);
+                    }
+                }
+            } 
+            else {
+
+                $nid = "";
+            }
+
+            //add the required js and css files as using #attached attribute
+            $element += array(
+                '#type' => 'fieldset',
+                '#delta' => $delta,
+                '#attached' => array(
+                    'css' => array(drupal_get_path('module', 'author_field') . '/author_field.css'),
+                    'js' => array(drupal_get_path('module', 'author_field') . '/author_field.js'),
+                ),
+            );
+
+            $element['author_node_id'] = array(
+                '#type' => 'textfield',
+                '#default_value' => '',
+                '#attributes' => array('class' => array('author-full')),
+            );
+
+            $delete_icon = $base_url . '/' . drupal_get_path('module', 'author_field') . '/delete_icon.gif';
+            //html markup element to hold the author list data
+            $element['list'] = array(
+                '#markup' => '<div style="display:none;" class="field-author-list"></div><div nid="' . $nid . '" style="display:none;" class="field-author-display"><div class="field-author-name">' . $name . '</div><div class="field-author-nid">' . $nid_text . '</div><img  src="' . $delete_icon . '" title="' . t('Delete Entry') . '" class="field-author-delete" /><br/><div class="field-author-organization">' . $organization . '</div></div>',
+                '#attributes' => array('class' => array('author-list')),
+            );
+
+            break;
+    }
+    return $element;
+}
+
+/**
+ * Implements hook_field_error().
+ */
+function author_field_field_widget_error($element, $error, $form, &$form_state) {
+    switch ($error['error']) {
+        case 'author_field_invalid':
+            form_error($element, $error['message']);
+            break;
+    }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function author_field_permission() {
+    return array(
+        'add new organization' => array(
+            'title' => t('Add New Organization'),
+            'description' => t('Allows users to add new terms to organization vocabulary.'),
+        ),
+    );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function author_field_menu() {
+    $items = array();
+    $items['author_field_getdata'] = array(
+        'title' => 'Get Author List',
+        'page callback' => 'author_field_getAuthorData',
+        'access arguments' => array("access content"),
+        'type' => MENU_CALLBACK,
+    );
+    $items['author_field_getnid'] = array(
+        'title' => 'Get Node ID',
+        'page callback' => 'author_field_getNodeId',
+        'access arguments' => array("access content"),
+        'type' => MENU_CALLBACK,
+    );
+
+    return $items;
+}
+
+/**
+ * Implements hook_node_validate().
+ */
+function author_field_node_validate($node, $form, &$form_state) {
+
+    if (isset($node->field_author_organization['und'])) {
+        $count_terms = count($node->field_author_organization['und']);
+
+        for ($i = 0; $i < $count_terms; $i++) {
+
+            $term = taxonomy_term_load($node->field_author_organization['und'][$i]['tid']);
+            if ($term == FALSE) {
+                if ($node->field_author_organization['und'][$i]['tid'] == "autocreate") {
+                    if (!user_access("add new organization")) {
+                        form_set_error('field_author_organization', t('You do not have permission to add new organization term.'));
+                    } 
+                    else {
+                        //invoke the hook so that other module can perform the post operations on author node
+                        module_invoke_all('author_save', $node);
+                    }
+                }
+            }
+        }
+    }
+}

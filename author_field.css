@@ -1,0 +1,88 @@
+/**
+* @file
+* 
+*/
+
+div.field-author-view { 
+    border: 1px dotted gray; padding: 5px;
+}
+
+div#field-author-load{
+    background-color: lightblue;
+}
+.td-profile-picture{
+    width: 100px;
+}
+.profile-picture{
+
+    width: 95px;
+    height: 95px;
+}
+div.form-item table .form-type-textfield,
+div.form-item table .form-type-textfield * {
+    display: inline-block;
+}
+
+div.field-author-addnewentry{
+    padding-left: 5px;
+    border-bottom: 1px solid gray;
+    cursor: pointer;
+    color:red;
+}
+div.field-author-addnewentry:hover{
+    color:#000080;
+    background-color: #F5FFFA;
+}
+div.field-author-entry{
+
+    border-bottom: 1px solid gray;
+    cursor: pointer;
+}
+
+div.loading-gif-large{
+
+    background-image: url('loading-gif-animation.gif') !important;
+    background-repeat:no-repeat !important;
+    background-attachment:fixed !important;
+    background-position:center !important; 
+}
+div.field-author-entry:hover{
+
+    background: repeat #F0F8FF;
+}
+
+img.field-author-delete{
+    float:left;
+    margin-left:5px;
+    cursor: pointer;
+}
+div.field-author-name{
+
+    float:left;
+    margin-left:5px;
+}
+
+div.field-author-nid{
+    float:left; 
+    margin-left: 10px;
+
+}
+
+div.field-author-organization{
+
+    margin-left:5px;
+}
+
+
+.field-author-entry-bg{
+    background: repeat #F0F8FF;
+}
+div.field-author-list{
+    background: none repeat scroll 0 0 white;
+    max-height: 300px;
+    overflow-y: scroll;
+    border: 1px solid black;
+    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.80);
+    -moz-box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.80);
+    -webkit-box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.80);
+}

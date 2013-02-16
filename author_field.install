@@ -1,0 +1,195 @@
+<?php
+
+/**
+* @file
+* Install, uninstall functions for the author field module.
+*/
+
+
+/**
+ * Implements hook_field_schema().
+ */
+function author_field_field_schema($field) {
+    $columns = array(
+        'author_node_id' => array('type' => 'int', 'not null' => TRUE),
+    );
+    $indexes = array(
+        'author_node_id' => array('author_node_id'),
+    );
+    return array(
+        'columns' => $columns,
+        'indexes' => $indexes,
+    );
+}
+
+function author_field_delete_all() {
+    foreach (array_keys(_author_field_installed_fields())as $field) {
+        field_delete_field($field);
+    }
+
+    $instances = field_info_instances('node', 'author_contents');
+    foreach ($instances as $instance_name => $instance) {
+        field_delete_instance($instance);
+    }
+
+    // Delete our content type. 
+    node_type_delete('author_content');
+
+    // Purge all field information. 
+    field_purge_batch(1000);
+
+    //delete the vocabulary 
+    taxonomy_vocabulary_delete(variable_get('author_field_organization_vocab', 0));
+}
+
+/**
+ * Implementation of hook_uninstall().
+ *
+ */
+function author_field_uninstall() {
+
+//    node_delete_multiple($nids);
+}
+
+function author_field_install() {
+
+
+    // Make sure a author_field_content_type content type doesn't already exist
+    if (!in_array('author_content', node_type_get_names())) {
+        $type = array(
+            'type' => 'author_content',
+            'name' => st('Author'),
+            'base' => 'node_content',
+            'custom' => 1,
+            'modified' => 1,
+            'locked' => 0,
+            'title_label' => 'Name',
+            'description' => 'Stores the author\'s name, email, organization, biography and picture.',
+        );
+
+        $type = node_type_set_defaults($type);
+        node_type_save($type);
+    }
+
+
+    $vocabulary = taxonomy_vocabulary_load(variable_get('author_field_organization_vocab', 0));
+    if (!$vocabulary) {
+        $edit = array(
+            'name' => st('Organizations'),
+            'machine_name' => 'author_field_organization_vocab',
+            'description' => st('Organizations'),
+            'hierarchy' => 1,
+            'module' => 'author_field',
+            'weight' => -10,
+        );
+        $vocabulary = (object) $edit;
+        taxonomy_vocabulary_save($vocabulary);
+        variable_set('author_field_organization_vocab', $vocabulary->vid);
+    }
+
+
+    node_types_rebuild();
+
+
+    foreach (_author_field_installed_fields() as $field) {
+        field_create_field($field);
+    }
+
+    foreach (_author_field_installed_instances()as $instance) {
+
+        $instance['entity_type'] = 'node';
+        $instance['bundle'] = 'author_content';
+
+        field_create_instance($instance);
+    }
+}
+
+function _author_field_installed_fields() {
+
+    $t = get_t();
+    $vocabulary = taxonomy_vocabulary_load(variable_get('author_field_organization_vocab', 0));
+
+    return array(
+        'field_author_bio' => array(
+            'field_name' => 'field_author_bio',
+            'label' => $t('Biography'),
+            'type' => 'text_with_summary',
+        ),
+        'field_author_email' => array(
+            'field_name' => 'field_author_email',
+            'label' => $t('Email'),
+            'type' => 'email',
+        ),
+        'field_author_picture' => array(
+            'field_name' => 'field_author_picture',
+            'label' => $t('Picture'),
+            'type' => 'image',
+        ),
+        'field_author_organization' => array(
+            'field_name' => 'field_author_organization',
+            'label' => $t('Organizations'),
+            'type' => 'taxonomy_term_reference',
+            'settings' => array(
+                'allowed_values' => array(
+                    array(
+                        'vocabulary' => $vocabulary->machine_name,
+                        'parent' => 0,
+                    ),
+                ),
+            ),
+            // Set cardinality to unlimited for tagging.
+            'cardinality' => FIELD_CARDINALITY_UNLIMITED,
+        ),
+    );
+}
+
+function _author_field_installed_instances() {
+
+    $t = get_t();
+    return array(
+        'field_author_bio' => array(
+            'field_name' => 'field_author_bio',
+            //       'type' => 'text',
+            'label' => $t('Biography'),
+            'widget' => array(
+                'type' => 'text_textarea_with_summary',
+            // 'max_length' => '65535',
+            ),
+            'display' => array('default' => array('label' => $t('Biography'), 'type' => 'text')),
+        ),
+        'field_author_email' => array(
+            'field_name' => 'field_author_email',
+            //       'type' => 'text',
+            'label' => $t('Email'),
+            'widget' => array(
+                'type' => 'email_textfield',
+            ),
+            'display' => array('default' => array('label' => $t('Email'), 'type' => 'email')),
+        ),
+        'field_author_picture' => array(
+            'field_name' => 'field_author_picture',
+            //     'type' => 'text',
+            'label' => $t('Picture'),
+            'widget' => array(
+                'type' => 'image',
+            ),
+            'display' => array('default' => array('label' => $t('Picture'), 'type' => 'image')),
+        ),
+        'field_author_organization' => array(
+            'field_name' => 'field_author_organization',
+            //    'type' => 'text',
+            'label' => $t('Organizations'),
+            'widget' => array(
+                'type' => 'taxonomy_autocomplete',
+                'behaviors' => array(
+                    'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+                ),
+            ),
+            'display' => array('default' => array('label' => $t('Organizations'), 'type' => 'taxonomy_term_reference_link')),
+            'teaser' => array(
+                'type' => 'taxonomy_term_reference_link',
+                'weight' => 10,
+            ),
+        ),
+    );
+}
