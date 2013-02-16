@@ -1,6 +1,6 @@
 -- SUMMARY --
 
-This module provides a field type for storing authors.
+This Drupal module provides a field type for storing authors.
 
 The module creates a custom content type called 'author_content' and store each author information using that content type.
 Fields such as email, biography, organizations, and picture are automatically created and added to the 'author_content' content type.
